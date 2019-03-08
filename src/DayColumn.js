@@ -27,6 +27,9 @@ function startsAfter(date, max) {
 
 class DayColumn extends React.Component {
   static propTypes = {
+    allDayOpen: PropTypes.bool,
+    openHours: PropTypes.object,
+
     events: PropTypes.array.isRequired,
     step: PropTypes.number.isRequired,
     min: PropTypes.instanceOf(Date).isRequired,
@@ -91,12 +94,14 @@ class DayColumn extends React.Component {
 
   render() {
     const {
+      allDayOpen,
       min,
       max,
       step,
       now,
       selectRangeFormat,
       culture,
+      openHours,
       ...props
     } = this.props
 
@@ -104,10 +109,30 @@ class DayColumn extends React.Component {
     let { selecting, startSlot, endSlot } = this.state
     let style = this._slotStyle(startSlot, endSlot)
 
-    let selectDates = {
-      start: this.state.startDate,
-      end: this.state.endDate
-    };
+    let start = this.state.startDate
+    let end = this.state.endDate
+
+    if(allDayOpen === false && openHours && start && end) {
+      if (start.getHours() === openHours.start.hour && start.getMinutes() < openHours.start.minute) {
+        if (end.getHours() === openHours.start.hour && end.getMinutes() < openHours.start.minute) {
+          end.setHours(openHours.start.hour)
+          end.setMinutes(openHours.start.minute)
+        }
+
+        start.setMinutes(openHours.start.minute)
+      }
+
+      if (end.getHours() > openHours.end.hour) {
+        end.setHours(openHours.end.hour)
+        end.setMinutes(openHours.end.minute)
+      } else if (end.getHours() === openHours.end.hour && end.getMinutes() > openHours.end.minute) {
+        end.setMinutes(openHours.end.minute)
+      }
+
+      if (end < start) {
+        start = new Date(end)
+      }
+    }
 
     return (
       <TimeColumn
@@ -123,10 +148,10 @@ class DayColumn extends React.Component {
       >
         {this.renderEvents()}
 
-        {selecting &&
+        {!props.disableDragSelection && selecting &&
           <div className='rbc-slot-selection' style={style}>
               <span>
-              { localizer.format(selectDates, selectRangeFormat, culture) }
+              { localizer.format({start, end}, selectRangeFormat, culture) }
               </span>
           </div>
         }
@@ -140,14 +165,9 @@ class DayColumn extends React.Component {
       , min
       , max
       , showMultiDayTimes
-      , culture
       , eventPropGetter
       , selected
-      , messages
       , eventComponent
-      , eventTimeRangeFormat
-      , eventTimeRangeStartFormat
-      , eventTimeRangeEndFormat
       , eventWrapperComponent: EventWrapper
       , rtl: isRtl
       , step
@@ -161,7 +181,6 @@ class DayColumn extends React.Component {
     })
 
     return styledEvents.map(({ event, style }, idx) => {
-      let _eventTimeRangeFormat = eventTimeRangeFormat;
       let _continuesPrior = false;
       let _continuesAfter = false;
       let start = get(event, startAccessor)
@@ -170,25 +189,17 @@ class DayColumn extends React.Component {
       if (start < min) {
         start = min;
         _continuesPrior = true;
-        _eventTimeRangeFormat = eventTimeRangeEndFormat;
       }
 
       if (end > max) {
         end = max;
         _continuesAfter = true;
-        _eventTimeRangeFormat = eventTimeRangeStartFormat;
       }
 
       let continuesPrior = startsBefore(start, min)
       let continuesAfter = startsAfter(end, max)
 
       let title = get(event, titleAccessor)
-      let label;
-      if (_continuesPrior && _continuesAfter) {
-        label = messages.allDay;
-      } else {
-          label = localizer.format({start, end}, _eventTimeRangeFormat, culture);
-      }
 
       let _isSelected = isSelected(event, selected)
 
@@ -212,7 +223,7 @@ class DayColumn extends React.Component {
               width: `${width}%`,
               ...bgColorStyle // added
             }}
-            title={(typeof label === 'string' ? label + ': ' : '') + title }
+            title={title}
             onClick={(e) => this._select(event, e)}
             onDoubleClick={(e) => this._doubleClick(event, e)}
             className={cn('rbc-event', className, {
@@ -223,7 +234,6 @@ class DayColumn extends React.Component {
               'rbc-event-continues-day-after': _continuesAfter
             })}
           >
-            <div className='rbc-event-label'>{label}</div>
             <div className='rbc-event-content'>
               { EventComponent
                 ? <EventComponent event={event} title={title}/>

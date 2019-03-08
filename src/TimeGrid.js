@@ -7,12 +7,10 @@ import dates from './utils/dates';
 import localizer from './localizer'
 import DayColumn from './DayColumn';
 import TimeColumn from './TimeColumn';
-import DateContentRow from './DateContentRow';
 import Header from './Header';
 
 import getWidth from 'dom-helpers/query/width';
 import scrollbarSize from 'dom-helpers/util/scrollbarSize';
-import message from './utils/messages';
 
 import { accessor, dateFormat } from './utils/propTypes';
 
@@ -20,7 +18,7 @@ import { notify } from './utils/helpers';
 
 import { accessor as get } from './utils/accessors';
 
-import { inRange, sortEvents, segStyle } from './utils/eventLevels';
+import { segStyle } from './utils/eventLevels';
 
 export default class TimeGrid extends Component {
 
@@ -98,9 +96,6 @@ export default class TimeGrid extends Component {
       this.measureGutter()
     }
     this.applyScroll();
-
-    this.positionTimeIndicator();
-    this.triggerTimeIndicatorUpdate();
   }
 
   componentWillUnmount() {
@@ -113,8 +108,6 @@ export default class TimeGrid extends Component {
     }
 
     this.applyScroll();
-    this.positionTimeIndicator();
-    //this.checkOverflow()
   }
 
   componentWillReceiveProps(nextProps) {
@@ -139,51 +132,20 @@ export default class TimeGrid extends Component {
   }
 
   render() {
-    let {
-        events
-      , range
-      , width
-      , startAccessor
-      , endAccessor
-      , allDayAccessor
-      , showMultiDayTimes} = this.props;
+    let { events, range, width, now } = this.props;
 
     width = width || this.state.gutterWidth;
 
-    let start = range[0]
-      , end = range[range.length - 1]
-
     this.slots = range.length;
 
-    let allDayEvents = []
-      , rangeEvents = [];
-
-    events.forEach(event => {
-      if (inRange(event, start, end, this.props)) {
-        let eStart = get(event, startAccessor)
-          , eEnd = get(event, endAccessor);
-
-        if (get(event, allDayAccessor)
-          || (dates.isJustDate(eStart) && dates.isJustDate(eEnd))
-          || (!showMultiDayTimes && !dates.eq(eStart, eEnd, 'day'))) {
-          allDayEvents.push(event)
-        } else {
-          rangeEvents.push(event)
-        }
-      }
-    })
-
-    allDayEvents.sort((a, b) => sortEvents(a, b, this.props))
-
-    let gutterRef = ref => this._gutters[1] = ref && findDOMNode(ref);
+    let gutterRef = ref => this._gutters[0] = ref && findDOMNode(ref);
 
     return (
       <div className='rbc-time-view'>
 
-        {this.renderHeader(range, allDayEvents, width)}
+        {this.renderHeader(range, width)}
 
         <div ref='content' className='rbc-time-content'>
-          <div ref='timeIndicator' className='rbc-current-time-indicator' />
 
           <TimeColumn
             {...this.props}
@@ -193,7 +155,7 @@ export default class TimeGrid extends Component {
             className='rbc-time-gutter'
           />
 
-          {this.renderEvents(range, rangeEvents, this.props.now)}
+          {this.renderEvents(range, events, now)}
 
         </div>
       </div>
@@ -204,12 +166,12 @@ export default class TimeGrid extends Component {
     let { min, max, endAccessor, startAccessor, components } = this.props;
 
     return range.map((date, idx) => {
-      let daysEvents = events.filter(
-        event => dates.inRange(date,
-          get(event, startAccessor),
-          get(event, endAccessor), 'day')
-      )
-
+      let daysEvents = events
+        .filter(event => {
+          if (date.getDay() !== event.end.getDay()) return event
+          return event.end.getHours() !== 0 || event.end.getMinutes() !== 0 || event.end.getSeconds() > 0
+        })
+        .filter(event => dates.inRange(date, get(event, startAccessor), get(event, endAccessor), 'day'))
       return (
         <DayColumn
           {...this.props }
@@ -228,8 +190,8 @@ export default class TimeGrid extends Component {
     })
   }
 
-  renderHeader(range, events, width) {
-    let { messages, rtl, selectable, components, now } = this.props;
+  renderHeader(range, width) {
+    let { rtl } = this.props;
     let { isOverflowing } = this.state || {};
 
     let style = {};
@@ -251,37 +213,6 @@ export default class TimeGrid extends Component {
             style={{ width }}
           />
           { this.renderHeaderCells(range) }
-        </div>
-        <div className='rbc-row'>
-          <div
-            ref={ref => this._gutters[0] = ref}
-            className='rbc-label rbc-header-gutter'
-            style={{ width }}
-          >
-            { message(messages).allDay }
-          </div>
-          <DateContentRow
-            now={now}
-            minRows={2}
-            range={range}
-            rtl={this.props.rtl}
-            events={events}
-            className='rbc-allday-cell'
-            selectable={selectable}
-            onSelectSlot={this.handleSelectAllDaySlot}
-            dateCellWrapper={components.dateCellWrapper}
-            eventComponent={this.props.components.event}
-            eventWrapperComponent={this.props.components.eventWrapper}
-            titleAccessor={this.props.titleAccessor}
-            startAccessor={this.props.startAccessor}
-            endAccessor={this.props.endAccessor}
-            allDayAccessor={this.props.allDayAccessor}
-            eventPropGetter={this.props.eventPropGetter}
-            selected={this.props.selected}
-            onSelect={this.handleSelectEvent}
-            onDoubleClick={this.handleDoubleClickEvent}
-            longPressThreshold={this.props.longPressThreshold}
-          />
         </div>
       </div>
     )
@@ -397,38 +328,5 @@ export default class TimeGrid extends Component {
         this._updatingOverflow = false;
       })
     }
-  }
-
-  positionTimeIndicator() {
-    const { rtl, min, max } = this.props
-    const now = new Date();
-
-    const secondsGrid = dates.diff(max, min, 'seconds');
-    const secondsPassed = dates.diff(now, min, 'seconds');
-
-    const timeIndicator = this.refs.timeIndicator;
-    const factor = secondsPassed / secondsGrid;
-    const timeGutter = this._gutters[this._gutters.length - 1];
-
-    if (timeGutter && now >= min && now <= max) {
-      const pixelHeight = timeGutter.offsetHeight;
-      const offset = Math.floor(factor * pixelHeight);
-
-      timeIndicator.style.display = 'block';
-      timeIndicator.style[rtl ? 'left' : 'right'] = 0;
-      timeIndicator.style[rtl ? 'right' : 'left'] = timeGutter.offsetWidth + 'px';
-      timeIndicator.style.top = offset + 'px';
-    } else {
-      timeIndicator.style.display = 'none';
-    }
-  }
-
-  triggerTimeIndicatorUpdate() {
-    // Update the position of the time indicator every minute
-    this._timeIndicatorTimeout = window.setTimeout(() => {
-      this.positionTimeIndicator();
-
-      this.triggerTimeIndicatorUpdate();
-    }, 60000)
   }
 }

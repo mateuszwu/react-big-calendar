@@ -14,10 +14,10 @@ let timeRangeFormat = ({ start, end }, culture, local)=>
     ' — ' + local.format(end, inSame12Hr(start, end) ? 'h:mm' : 'h:mmtt', culture)
 
 let timeRangeStartFormat = ({ start, end }, culture, local)=>
-  local.format(start, 'h:mmtt', culture) +' — '
+  local.format(start, 'h:mmtt', culture) + ' — ' + local.format(end, 'h:mmtt', culture)
 
 let timeRangeEndFormat = ({ start, end }, culture, local)=>
-  ' — ' + local.format(end, 'h:mmtt', culture)
+  local.format(start, 'h:mmtt', culture) + ' — ' + local.format(end, 'h:mmtt', culture)
 
 let weekRangeFormat = ({ start, end }, culture, local)=>
   local.format(start, 'MMM dd', culture) +

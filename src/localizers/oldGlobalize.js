@@ -10,10 +10,10 @@ let timeRangeFormat = ({ start, end }, culture, local)=>
     ' — ' + local.format(end, 't', culture)
 
 let timeRangeStartFormat = ({ start, end }, culture, local)=>
-  local.format(start, 't', culture) + ' — '
+  local.format(start, 'h:mmtt', culture) + ' — ' + local.format(end, 'h:mmtt', culture)
 
 let timeRangeEndFormat = ({ start, end }, culture, local)=>
-  ' — ' + local.format(end, 't', culture)
+  local.format(start, 'h:mmtt', culture) + ' — ' + local.format(end, 'h:mmtt', culture)
 
 let weekRangeFormat = ({ start, end }, culture, local)=>
   local.format(start, 'MMM dd', culture) +

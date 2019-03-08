@@ -34,7 +34,6 @@ export default class TimeSlot extends Component {
             'rbc-time-slot',
             className,
             this.props.showLabel && 'rbc-label',
-            this.props.isNow && 'rbc-now',
           )}
         >
         {this.props.showLabel &&
