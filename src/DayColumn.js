@@ -132,6 +132,10 @@ class DayColumn extends React.Component {
       if (end < start) {
         start = new Date(end)
       }
+
+      if(end.getHours() === 23 && end.getMinutes() === 59 && end.getSeconds() === 59) {
+        end.setSeconds(end.getSeconds() + 1);
+      }
     }
 
     return (
